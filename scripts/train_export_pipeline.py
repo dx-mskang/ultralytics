@@ -53,6 +53,7 @@ def train_and_export(
     device: str,
     workers: int,
     skip_train_if_exists: bool,
+    opset: int | None = None,
 ) -> dict:
     best_pt = trained_weight_path(task, run_name)
 
@@ -66,7 +67,7 @@ def train_and_export(
             batch=batch,
             device=device,
             workers=workers,
-            project="runs/relu_train",
+            project=str(Path.cwd() / "runs" / "relu_train"),
             name=run_name,
             pretrained=False,
         )
@@ -86,7 +87,8 @@ def train_and_export(
         imgsz=imgsz,
         device=device,
         simplify=False,
-        project="runs/onnx_export",
+        opset=opset,
+        project=str(Path.cwd() / "runs" / "onnx_export"),
         name=run_name,
     )
     # Normalize ReLU export filename to run_name.onnx (avoid ambiguous "best.onnx")
@@ -100,21 +102,8 @@ def train_and_export(
 
     return {"run_name": run_name, "best_pt": str(best_pt), "onnx": str(onnx_path)}
 
-
-def export_world(weights: str, run_name: str, imgsz: int, device: str) -> dict:
+def export_world(weights: str, run_name: str, imgsz: int, device: str, opset: int | None = None) -> dict:
     is_world_v1 = ("-world" in weights) and ("worldv2" not in weights)
-
-    if not is_world_v1:
-        model = YOLO(weights)
-        onnx_path = model.export(
-            format="onnx",
-            imgsz=imgsz,
-            device=device,
-            simplify=False,
-            project="runs/onnx_export",
-            name=run_name,
-        )
-        return {"run_name": run_name, "weights": weights, "imgsz": imgsz, "onnx": str(onnx_path)}
 
     last_error = None
     for size in _world_v1_export_sizes(imgsz):
@@ -126,12 +115,23 @@ def export_world(weights: str, run_name: str, imgsz: int, device: str) -> dict:
                 imgsz=size,
                 device=device,
                 simplify=False,
-                project="runs/onnx_export",
+                opset=opset,
+                project=str(Path.cwd() / "runs" / "onnx_export"),
                 name=run_name,
             )
+            # Normalize export filename to run_name.onnx (avoid ambiguous "best.onnx")
+            onnx_path = Path(str(onnx_path))
+            target_onnx = onnx_path.parent / f"{run_name}.onnx"
+            if onnx_path != target_onnx and onnx_path.exists():
+                if target_onnx.exists():
+                    target_onnx.unlink()
+                onnx_path.replace(target_onnx)
+                onnx_path = target_onnx
             return {"run_name": run_name, "weights": weights, "imgsz": size, "onnx": str(onnx_path)}
         except Exception as e:
             last_error = e
+            if not is_world_v1:
+                raise RuntimeError(f"YOLO-World v2 ONNX export failed. Last error: {last_error}")
 
     raise RuntimeError(f"YOLO-World v1 ONNX export failed for all tried sizes. Last error: {last_error}")
 
@@ -145,6 +145,7 @@ def main() -> None:
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--workers", type=int, default=0)
     parser.add_argument("--skip-trained", action="store_true")
+    parser.add_argument("--opset", type=int, default=None, help="ONNX opset version (default: auto)")
     args = parser.parse_args()
 
     relu_jobs = [
@@ -180,6 +181,7 @@ def main() -> None:
                     device=args.device,
                     workers=args.workers,
                     skip_train_if_exists=args.skip_trained,
+                    opset=args.opset,
                 )
             )
         except Exception as e:
@@ -190,7 +192,7 @@ def main() -> None:
         try:
             print(f"[RUN] export {run_name} ({weights})")
             summary["world_export"].append(
-                export_world(weights=weights, run_name=run_name, imgsz=args.world_imgsz, device=args.device)
+                export_world(weights=weights, run_name=run_name, imgsz=args.world_imgsz, device=args.device, opset=args.opset)
             )
         except Exception as e:
             summary["world_export"].append({"run_name": run_name, "weights": weights, "error": str(e)})

@@ -1,0 +1,9 @@
+# Ultralytics YOLO ReLU Training + ONNX Export Requirements
+# Install: pip install -r requirements_train_export.txt
+
+# Core dependencies
+ultralytics>=8.0.0  # YOLO 모델 학습 및 export를 위한 메인 패키지
+
+# ONNX export dependencies (per docs/relu_yaml_authoring_guide_ko.md)
+onnx>=1.12.0,<2.0.0
+onnxslim>=0.1.71  # ONNX 모델 최적화 (--simplify 옵션 사용 시 필요)

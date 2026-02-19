@@ -23,7 +23,8 @@ python3 -m venv .venv
   --world-imgsz 1280 \
   --batch 4 \
   --device cpu \
-  --workers 0
+  --workers 0 \
+  --opset 21  # ONNX opset 21로 설정
 ```
 
 빠른 테스트(스모크):
@@ -34,7 +35,8 @@ python3 -m venv .venv
   --imgsz 96 \
   --batch 4 \
   --device cpu \
-  --workers 0
+  --workers 0 \
+  --opset 21  # ONNX opset 21로 설정
 ```
 
 이미 학습된 ReLU `best.pt` 재사용해서 ONNX만 다시 export:
@@ -46,7 +48,8 @@ python3 -m venv .venv
   --world-imgsz 1280 \
   --batch 4 \
   --device cpu \
-  --workers 0
+  --workers 0 \
+  --opset 21  # ONNX opset 21로 설정
 ```
 
 ## 2) 커맨드 실행 시 생성 파일/경로
@@ -125,7 +128,13 @@ activation: torch.nn.ReLU() # (optional) model default activation function
 - `ultralytics/cfg/models/11/yolo11-pose-relu.yaml`
 - `ultralytics/cfg/models/26/yolo26-pose-relu.yaml`
 
-## 6) YOLO-World v1/v2 메모
+## 6) ONNX opset 설정
+
+- 기본값: 자동 선택 (Torch 버전에 따라 결정)
+- opset 21로 명시적 설정: `--opset 21` 인자 추가
+- 지원되는 opset 범위: ONNX 버전에 따라 다름
+
+## 7) YOLO-World v1/v2 메모
 
 - `v2`: `imgsz=1280`로 export
 - `v1`: 일부 환경에서 `1280` 실패 가능, 스크립트가 호환 해상도(예: `1248`)로 자동 재시도
